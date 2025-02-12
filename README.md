@@ -1,79 +1,62 @@
-# Run llama.cpp on [RunPod](https://www.runpod.io/serverless-gpu)
 
+# Llama RunPod
 
-## Description
+This repository contains the setup for deploying a Llama model using `llama-cpp-python` on RunPod. Follow the instructions below to configure your environment, build the Docker image, and deploy it.
 
-RunPod provides a cheap serverless GPU service that allows to simply serve AI models. They handle queuing and auto-scaling.
+## Prerequisites
 
-You just have to provide a Docker image. This repository contains instructions to build your own image for any model.
+- Docker installed on your machine
+- Access to a RunPod account
+- An API key from RunPod
 
-## Steps
+## Setup
 
-1. Clone this repository
-2. Choose a model and download it to the `workspace` directory. Here we use [this model](https://huggingface.co/TheBloke/WizardLM-1.0-Uncensored-Llama2-13B-GGML) with 13B parameters.
+### Step 1: Create the `.env` File
 
-```
-wget -P workspace https://huggingface.co/TheBloke/WizardLM-1.0-Uncensored-Llama2-13B-GGML/resolve/main/wizardlm-1.0-uncensored-llama2-13b.ggmlv3.q4_K_M.bin
-```
-
-3. Build the Docker image. Create a `llama-runpod` repository on [Docker Hub](https://hub.docker.com/) and replace `your-docker-hub-login` with your login.
+Create a `.env` file in the root of your project directory. This file will store the necessary environment variables for your deployment. Here’s an example of what your `.env` file should look like:
 
 ```
-docker build -t llama-runpod .
-docker tag llama-runpod your-docker-hub-login/llama-runpod:latest
-docker push your-docker-hub-login/llama-runpod:latest
+# Model URI for the Llama model
+MODEL_URI=hf.co/Nekuromento/watt-tool-8B-Q5_K_M-GGUF
+
+# API Key for RunPod
+API_KEY=your_api_key_here
+
+# Docker Registry URL
+REGISTRY=393783582607.dkr.ecr.us-east-2.amazonaws.com
 ```
 
-4. Go to RunPod's serverless [console](https://www.runpod.io/console/serverless) and create a template:
+Make sure to replace `your_api_key_here` with your actual API key.
 
-![RunPod template](readme-images/template.png
-)
+### Step 2: Build the Docker Image
 
-You can pass the arguments to `llama_cpp` in the `LLAMA_ARGS` environment variable. Here are mine:
+Once you have your `.env` file set up, you can build the Docker image. Use the provided `build-and-push.sh` script to automate this process. Run the following command in your terminal:
 
-```
-{"model_path": "wizardlm-1.0-uncensored-llama2-13b.ggmlv3.q4_K_M.bin", "n_gpu_layers": -1}
-```
-
-`n_gpu_layers` is set to -1 to offload all layers to the GPU.
-
-5. Create the endpoint:
-
-![RunPod endpoint](readme-images/endpoint.png)
-
-6. Profit!
-
-
-Replace `ENDPOINT_ID` and `API_KEY` with your own values. You can get `API_KEY` on [that page](https://www.runpod.io/console/serverless/user/settings).
-
-
-```python
-import requests
-
-url = "https://api.runpod.ai/v2/ENDPOINT_ID"
-headers = {"Authorization": "API_KEY"}
-
-
-payload = {"input": {"prompt": "Me: Hello, what is your purpose?\nAI:"}}
-
-# sync (blocking)
-r = requests.post(url + "/runsync", json=payload, headers=headers)
-r.json()
-
-# async (non-blocking)
-r = requests.post(url + "/run", json=payload, headers=headers)
-id_ = r.json()["id"]
-
-# get async result
-r = requests.get(url + f"/status/{id_}", headers=headers)
-r.json()
+```bash
+./build-and-push.sh
 ```
 
-You can pass the keyword arguments to LLaMa in the payload. See the llama_cpp [docs](https://llama-cpp-python.readthedocs.io/en/latest/api-reference/#llama_cpp.Llama.__call__) for other arguments.
+This script will:
 
-## Additional details and tips
+- Load the environment variables from the `.env` file.
+- Extract the model name from the `MODEL_URI`.
+- Build the Docker image and push it to the specified Docker registry.
 
-- clean Docker after a build or if you get into trouble: `docker system prune -a`
-- debug your Docker image with `docker run -it llama-runpod`
-- we froze `llama-cpp-python==0.1.78` in `Dockerfile` because the model format changed from `ggmlv3` to `gguf` in version `0.1.79` but the conversion script in [llama.cpp](https://github.com/ggerganov/llama.cpp) is not fully working
-- you can test `handle.py` locally with `python handle.py`
+### Step 3: Deploy the Image on RunPod
+
+After successfully pushing the Docker image, you can deploy it on RunPod. Follow these steps:
+
+1. Log in to your RunPod account.
+2. Navigate to the "Deployments" section.
+3. Click on "Create New Deployment."
+4. Select the Docker image you just pushed (it should be in the format `your_registry/llama-server-model_name:latest`).
+5. Configure any additional settings as needed (e.g., resource allocation, environment variables).
+6. Click "Deploy" to start the deployment.
+
+### Step 4: Access the API
+
+Once the deployment is complete, you can access the API using the endpoint provided by RunPod. Make sure to include your API key in your requests for authentication.
+
+## Conclusion
+
+You have successfully set up your environment, built the Docker image, and deployed it on RunPod. If you have any questions or need further assistance, feel free to reach out.
